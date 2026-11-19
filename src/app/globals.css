@@ -9,7 +9,28 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  /* Headings in the system serif, like the app's titles (New York on Apple devices). */
+  --font-heading: ui-serif, "New York", Georgia, "Times New Roman", serif;
+  /* What a dose or scan was, in the app's colours: see "Status" in :root. */
+  --color-ok: var(--ok);
+  --color-ok-fill: var(--ok-fill);
+  --color-danger: var(--danger);
+  --color-danger-fill: var(--danger-fill);
+  --color-caution: var(--caution);
+  --color-caution-fill: var(--caution-fill);
+  --color-due: var(--due);
+  --color-due-fill: var(--due-fill);
+  /* Something that changed since the dashboard last looked: a ring that fades. */
+  --animate-fresh: fresh 2.4s ease-out;
+  @keyframes fresh {
+    0%,
+    35% {
+      box-shadow: 0 0 0 3px var(--due);
+    }
+    100% {
+      box-shadow: 0 0 0 3px transparent;
+    }
+  }
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,25 +69,35 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* The app's Palette (MyPharmacist/DesignSystem/Palette.swift): cream paper, espresso ink. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --background: #fdf8ec;
+  --foreground: #21140f;
+  --card: #fffefa;
+  --card-foreground: #21140f;
+  --popover: #fffefa;
+  --popover-foreground: #21140f;
+  --primary: #21140f;
+  --primary-foreground: #fff7e6;
+  --secondary: #f4eddd;
+  --secondary-foreground: #21140f;
+  --muted: #f4eddd;
+  --muted-foreground: #6e594c;
+  --accent: #f4eddd;
+  --accent-foreground: #21140f;
+  --destructive: #b8141a;
+  --border: #e6dccb;
+  --input: #ccbda8;
+  --ring: #1c4fa8;
+  /* Status: taken, missed, told not to take, due now, each with a pale fill. */
+  --ok: #146b2e;
+  --ok-fill: #e8f2de;
+  --danger: #b8141a;
+  --danger-fill: #fce8e0;
+  --caution: #805400;
+  --caution-fill: #fcebbd;
+  --due: #1c4fa8;
+  --due-fill: #e3ebf8;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -83,25 +114,34 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* The app is light only; this is the same paper at night, as the TestFlight pages have it. */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --background: #1a120e;
+  --foreground: #fff7e6;
+  --card: #241a15;
+  --card-foreground: #fff7e6;
+  --popover: #241a15;
+  --popover-foreground: #fff7e6;
+  --primary: #fff7e6;
+  --primary-foreground: #21140f;
+  --secondary: #33261f;
+  --secondary-foreground: #fff7e6;
+  --muted: #33261f;
+  --muted-foreground: #cdbba8;
+  --accent: #33261f;
+  --accent-foreground: #fff7e6;
+  --destructive: #ff8f86;
+  --border: #4a3a30;
+  --input: #5a483c;
+  --ring: #8fb4ff;
+  --ok: #7fcf93;
+  --ok-fill: #1f3324;
+  --danger: #ff8f86;
+  --danger-fill: #3d1c1a;
+  --caution: #e8b65a;
+  --caution-fill: #3a2c10;
+  --due: #8fb4ff;
+  --due-fill: #1b2a45;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);

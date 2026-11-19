@@ -35,6 +35,16 @@ export const outcomes = [
   "asNeeded",
 ] as const
 
+/** Whether `name` is a time zone this runtime knows, so times can be shown in it. */
+export function isTimeZone(name: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: name })
+    return true
+  } catch {
+    return false
+  }
+}
+
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected a day like 2026-11-19")
 const timeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Expected a time like 08:30")
 const instant = z.iso.datetime()
@@ -45,7 +55,7 @@ export const snapshotSchema = z.object({
   v: z.literal(1),
   sentAt: instant,
   /** The phone's time zone, like "America/Toronto", for showing times as it does. */
-  timeZone: z.string().min(1).max(64),
+  timeZone: z.string().min(1).max(64).refine(isTimeZone, "Expected a time zone like America/Toronto"),
   earlyWindowMinutes: z.int().min(0).max(24 * 60),
   lateWindowMinutes: z.int().min(0).max(24 * 60),
   /** The days covered, oldest first; the last is the phone's today. */

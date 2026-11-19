@@ -22,6 +22,27 @@ Without the Upstash variables, `npm run dev` keeps everyone in memory until it s
 Hosted on Vercel, with Upstash Redis from the Vercel Marketplace; there the API refuses
 to run without it.
 
+To see the dashboard without phones, start `npm run dev`, then `npm run seed:local`: it
+resets the local demo and adds four made-up people built around the time now (Maria's
+week is the app's "sample week"), and prints the link to open, with the key in it.
+
+## The dashboard
+
+One page, nothing to click during a demo. It asks the API for changes every 2 seconds.
+
+- A card per person, the latest update first: today's counts, the last 7 days (✓ taken,
+  ✗ missed, clock due now, · later), and "What happened": doses taken today, missed
+  doses, what the app told them not to take and why, unknown pills, when-needed tablets.
+- Anything that changed since the last look glows once; a new person's whole card does.
+- Facts only, no triage: nothing says "needs a call", and the page says the pharmacy
+  isn't alerted.
+- Reset demo removes everyone; Remove takes one person off. Their phones stop sharing.
+- The key: open `/#key=<DASHBOARD_KEY>` once and this browser keeps it; otherwise the
+  page asks for it.
+- The app's colours (cream and espresso), light or dark as the computer is set.
+
+The wording and states are worked out in `src/lib/card.ts`, tested in `test/card.test.ts`.
+
 ## API
 
 The iOS app sends `X-App-Token: <APP_TOKEN>`; the dashboard sends
