@@ -65,7 +65,7 @@ page on ui.shadcn.com first. This Next.js version ships its own docs in
 
 ## With the iOS app
 
-The app ([MyPharmacist](https://github.com/18gen/MyPharmacist)) shares from My pharmacy →
+The app ([MyPharmacist](https://github.com/18gen/my-pharmacist)) shares from My pharmacy →
 Share my doses, once its `Secrets.plist` has `PHARMACY_URL` (this dashboard's address)
 and `PHARMACY_TOKEN` (its `APP_TOKEN`). Its snapshot is `ShareSnapshot.swift`, the
 format `src/lib/snapshot.ts` checks.
