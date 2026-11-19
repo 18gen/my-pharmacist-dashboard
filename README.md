@@ -62,3 +62,42 @@ per person. At most 200 people at once.
 Add shadcn/ui components with `npx shadcn@latest add <name>`, checking the component's
 page on ui.shadcn.com first. This Next.js version ships its own docs in
 `node_modules/next/dist/docs/` (see `AGENTS.md`).
+
+## With the iOS app
+
+The app ([MyPharmacist](https://github.com/18gen/MyPharmacist)) shares from My pharmacy →
+Share my doses, once its `Secrets.plist` has `PHARMACY_URL` (this dashboard's address)
+and `PHARMACY_TOKEN` (its `APP_TOKEN`). Its snapshot is `ShareSnapshot.swift`, the
+format `src/lib/snapshot.ts` checks.
+
+To try the two together on a Mac, run `npm run dev` here and start a Debug build in the
+Simulator with these launch arguments:
+
+```
+-pharmacyURL http://localhost:3000 -pharmacyToken <APP_TOKEN> -resetWithSampleWeek -shareAs Maria
+```
+
+The app resets to a sample week (a dose due now, the six days before filled in) and joins
+as Maria. The Simulator can't scan, so try scans on a phone.
+
+## Demo checklist
+
+1. Before: open the dashboard's link with the key, and press Reset demo. On the phone:
+   About & privacy → Reset demo → With a sample week.
+2. On the phone: My pharmacy → Share my doses → a name → Start sharing. Their card
+   appears with the week: three missed doses, two "told not to take", one unknown pill.
+3. Scan the pills due now: today's cells turn ✓ and glow. Scan one again: "Told not to
+   take … already taken".
+4. After: Reset demo on the dashboard. Phones that shared show "Sharing stopped" the next
+   time they open.
+
+## Deploy (Vercel)
+
+1. Import this repository in Vercel.
+2. Add Upstash for Redis from the Vercel Marketplace to the project; it sets
+   `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+3. Set `APP_TOKEN` and `DASHBOARD_KEY` to two long random values in the project's
+   environment variables, and deploy.
+4. In the iOS app's `Secrets.plist`: `PHARMACY_URL` = the deployment's address,
+   `PHARMACY_TOKEN` = `APP_TOKEN`.
+5. Open `https://<the address>/#key=<DASHBOARD_KEY>` once on the computer for demos.
