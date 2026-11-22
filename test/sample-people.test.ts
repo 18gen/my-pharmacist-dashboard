@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { patientCard } from "@/lib/card"
+import { buildBoard, type PersonBoard } from "@/lib/board"
 import { snapshotSchema } from "@/lib/snapshot"
 
 import { maria, samplePeople } from "../scripts/sample-people"
@@ -11,6 +11,11 @@ function on(hours: number, minutes = 0): Date {
   return date
 }
 
+function mariasBoard(now: Date): PersonBoard {
+  const person = { id: "m", name: "Maria", joinedAt: now.toISOString(), updatedAt: now.toISOString(), snapshot: maria(now), photoToken: "t" }
+  return buildBoard([person], now, "updated").people[0]!
+}
+
 describe("the sample people", () => {
   it.each([on(7, 5), on(10, 32), on(14, 12), on(23, 58)])("send snapshots in the app's format at %s", (now) => {
     for (const person of samplePeople(now)) {
@@ -19,17 +24,16 @@ describe("the sample people", () => {
   })
 
   it.each([on(10, 32), on(14, 12)])("give Maria a dose due now at %s", (now) => {
-    const card = patientCard({ id: "m", name: "Maria", joinedAt: now.toISOString(), updatedAt: now.toISOString(), snapshot: maria(now) }, "Maria", now)
-    expect(card.today?.due).toBeGreaterThan(0)
+    const cells = mariasBoard(now).rows.flatMap((row) => row.cells)
+    expect(cells.some((cell) => cell.state === "due")).toBe(true)
   })
 
-  it("give Maria's week three misses and two pills she was told not to take", () => {
-    const now = on(14, 12)
-    const card = patientCard({ id: "m", name: "Maria", joinedAt: now.toISOString(), updatedAt: now.toISOString(), snapshot: maria(now) }, "Maria", now)
-    const titles = card.happenings.map((line) => line.title)
-    expect(titles.filter((title) => title.startsWith("Missed"))).toHaveLength(3)
-    expect(titles.filter((title) => title.startsWith("Told not to take"))).toHaveLength(2)
-    expect(titles).toContain("Scanned a pill that isn't on the list")
+  it("give Maria's week three doses not taken, two the app said not to take, and a pill not on the list", () => {
+    const cells = mariasBoard(on(14, 12)).rows.flatMap((row) => row.cells)
+    expect(cells.filter((cell) => cell.state === "missed")).toHaveLength(3)
+    expect(cells.filter((cell) => cell.warned)).toHaveLength(2)
+    expect(cells.filter((cell) => cell.state === "unknown")).toHaveLength(1)
+    expect(cells.some((cell) => cell.state === "noRecord")).toBe(false)
   })
 
   it("move Maria's times so one is due at the moment of the demo", () => {
