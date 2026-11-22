@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest"
 
+import { GET as getPhoto, PUT as putPhoto } from "@/app/api/patients/[id]/photos/[photoId]/route"
 import { DELETE, PUT } from "@/app/api/patients/[id]/route"
 import { GET, POST } from "@/app/api/patients/route"
 import { POST as reset } from "@/app/api/reset/route"
@@ -149,5 +150,103 @@ describe("removing", () => {
     await join("Maria")
     expect((await reset(request("/reset", "POST", asApp))).status).toBe(401)
     expect(await everyone()).toHaveLength(1)
+  })
+})
+
+describe("scanned pictures", () => {
+  /** A tiny file that starts as every JPEG does. */
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4])
+
+  function photoRequest(id: string, photoId: string, method: string, headers: Record<string, string>, body?: Uint8Array, token?: string): Request {
+    const query = token === undefined ? "" : `?t=${encodeURIComponent(token)}`
+    return new Request(`${base}/patients/${id}/photos/${photoId}${query}`, {
+      method,
+      headers: { "content-type": "image/jpeg", ...headers },
+      body: body ? Buffer.from(body) : undefined,
+    })
+  }
+
+  function photoContext(id: string, photoId: string): RouteContext<"/api/patients/[id]/photos/[photoId]"> {
+    return { params: Promise.resolve({ id, photoId }) }
+  }
+
+  async function sendPhoto(id: string, photoId: string, body: Uint8Array = jpeg): Promise<number> {
+    return (await putPhoto(photoRequest(id, photoId, "PUT", asApp, body), photoContext(id, photoId))).status
+  }
+
+  async function tokenOf(id: string): Promise<string> {
+    const list = (await everyone()) as (Patient & { photoToken: string })[]
+    return list.find((patient) => patient.id === id)?.photoToken ?? ""
+  }
+
+  async function loadPhoto(id: string, photoId: string, token: string): Promise<Response> {
+    return getPhoto(photoRequest(id, photoId, "GET", {}, undefined, token), photoContext(id, photoId))
+  }
+
+  it("keeps a picture the app sends, for the dashboard to load with the person's token", async () => {
+    const id = await join("Maria")
+    const photoId = crypto.randomUUID()
+    expect(await sendPhoto(id, photoId)).toBe(204)
+
+    const token = await tokenOf(id)
+    expect(token).not.toBe("")
+    const response = await loadPhoto(id, photoId, token)
+    expect(response.status).toBe(200)
+    expect(response.headers.get("content-type")).toBe("image/jpeg")
+    expect(response.headers.get("cache-control")).toContain("immutable")
+    expect(new Uint8Array(await response.arrayBuffer())).toEqual(jpeg)
+  })
+
+  it("finds a picture whatever the case of its ID", async () => {
+    const id = await join("Maria")
+    const photoId = crypto.randomUUID()
+    await sendPhoto(id, photoId.toUpperCase())
+    expect((await loadPhoto(id, photoId, await tokenOf(id))).status).toBe(200)
+  })
+
+  it("loads only with that person's token", async () => {
+    const maria = await join("Maria")
+    const ken = await join("Ken")
+    const photoId = crypto.randomUUID()
+    await sendPhoto(maria, photoId)
+    expect((await loadPhoto(maria, photoId, "")).status).toBe(401)
+    expect((await loadPhoto(maria, photoId, await tokenOf(ken))).status).toBe(401)
+    expect((await loadPhoto(maria, crypto.randomUUID(), await tokenOf(maria))).status).toBe(404)
+  })
+
+  it("takes only JPEGs, small ones, with an ID like a UUID, from the app", async () => {
+    const id = await join("Maria")
+    expect(await sendPhoto(id, crypto.randomUUID(), new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1]))).toBe(400)
+    const big = new Uint8Array(64 * 1024)
+    big.set([0xff, 0xd8, 0xff])
+    expect(await sendPhoto(id, crypto.randomUUID(), big)).toBe(413)
+    expect(await sendPhoto(id, "not-a-uuid")).toBe(400)
+    const photoId = crypto.randomUUID()
+    const status = (await putPhoto(photoRequest(id, photoId, "PUT", asDashboard, jpeg), photoContext(id, photoId))).status
+    expect(status).toBe(401)
+  })
+
+  it("answers 404 once the person is gone, as for snapshots", async () => {
+    const id = await join("Maria")
+    await reset(request("/reset", "POST", asDashboard))
+    expect(await sendPhoto(id, crypto.randomUUID())).toBe(404)
+  })
+
+  it("forgets a person's pictures when they stop sharing, or the demo is reset", async () => {
+    const maria = await join("Maria")
+    const ken = await join("Ken")
+    const mariasPhoto = crypto.randomUUID()
+    const kensPhoto = crypto.randomUUID()
+    await sendPhoto(maria, mariasPhoto)
+    await sendPhoto(ken, kensPhoto)
+    const mariasToken = await tokenOf(maria)
+    const kensToken = await tokenOf(ken)
+
+    await DELETE(request(`/patients/${maria}`, "DELETE", asApp), context(maria))
+    expect((await loadPhoto(maria, mariasPhoto, mariasToken)).status).toBe(404)
+    expect((await loadPhoto(ken, kensPhoto, kensToken)).status).toBe(200)
+
+    await reset(request("/reset", "POST", asDashboard))
+    expect((await loadPhoto(ken, kensPhoto, kensToken)).status).toBe(404)
   })
 })

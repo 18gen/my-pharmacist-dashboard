@@ -6,10 +6,12 @@ import { redisFromEnv } from "@/lib/redis"
  * - join: people starting to share, per network address. A classroom shares one
  *   address, so it is generous.
  * - write: snapshots, per person. A phone sends at most a couple a second while in use.
+ * - photo: scanned pills' pictures, per person: one per pill scanned, up to 12 a photo.
  */
 const rules = {
   join: Ratelimit.slidingWindow(60, "1 m"),
   write: Ratelimit.slidingWindow(120, "1 m"),
+  photo: Ratelimit.slidingWindow(240, "1 m"),
 } as const
 
 export type LimitKind = keyof typeof rules

@@ -1,6 +1,7 @@
 import { isApp, isDashboard } from "@/lib/auth"
 import { problem, readBody, RequestProblem, respond } from "@/lib/http"
 import { patientStore } from "@/lib/patients"
+import { photoStore } from "@/lib/photos"
 import { allow } from "@/lib/rate-limit"
 import { limits, snapshotSchema } from "@/lib/snapshot"
 
@@ -24,14 +25,15 @@ export async function PUT(request: Request, context: RouteContext<"/api/patients
 }
 
 /**
- * DELETE /api/patients/:id: the phone stops sharing, or the dashboard removes someone.
- * 204 even if they were already gone.
+ * DELETE /api/patients/:id: the phone stops sharing, or the dashboard removes someone,
+ * with their pictures. 204 even if they were already gone.
  */
 export async function DELETE(request: Request, context: RouteContext<"/api/patients/[id]">): Promise<Response> {
   return respond(async () => {
     if (!isApp(request) && !isDashboard(request)) return problem(401, "Not allowed")
     const { id } = await context.params
     await patientStore().remove([id])
+    await photoStore().removePatients([id])
     return new Response(null, { status: 204 })
   })
 }

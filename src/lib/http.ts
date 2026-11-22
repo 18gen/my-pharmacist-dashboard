@@ -28,6 +28,15 @@ export async function respond(work: () => Promise<Response>): Promise<Response> 
   }
 }
 
+/** The body as it came, at most `maxBytes` long: a picture. */
+export async function readBytes(request: Request, maxBytes: number): Promise<Uint8Array> {
+  const declared = Number(request.headers.get("content-length") ?? 0)
+  if (declared > maxBytes) throw new RequestProblem(413, "Too much to send")
+  const bytes = new Uint8Array(await request.arrayBuffer())
+  if (bytes.length > maxBytes) throw new RequestProblem(413, "Too much to send")
+  return bytes
+}
+
 /** The body as JSON checked against `schema`; at most `maxBytes` long. */
 export async function readBody<T>(request: Request, schema: z.ZodType<T>, maxBytes: number): Promise<T> {
   const declared = Number(request.headers.get("content-length") ?? 0)

@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto"
+
 /**
  * Who may call the API. Not accounts: the app sends one shared token, and the dashboard
  * one shared key, both set as environment variables.
@@ -25,6 +27,22 @@ export function isDashboard(request: Request): boolean {
   const header = request.headers.get("authorization") ?? ""
   const key = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : ""
   return sameSecret(key, process.env.DASHBOARD_KEY ?? "")
+}
+
+/**
+ * What lets the dashboard's <img> tags load one person's scanned pictures, which can't
+ * carry the key in a header: a signature of the person's ID made with the dashboard's key,
+ * handed out with the list (GET /api/patients) and checked by the picture route. It works
+ * until the person is gone (Reset demo, stop sharing); empty without a key.
+ */
+export function photoToken(patientId: string): string {
+  const key = process.env.DASHBOARD_KEY ?? ""
+  if (!key) return ""
+  return createHmac("sha256", key).update(`photos:${patientId}`).digest("base64url")
+}
+
+export function isPhotoToken(patientId: string, token: string): boolean {
+  return sameSecret(token, photoToken(patientId))
 }
 
 /** The caller's network address, as Vercel passes it on; "unknown" without one. */

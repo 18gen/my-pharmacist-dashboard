@@ -1,6 +1,7 @@
-import { clientAddress, isApp, isDashboard } from "@/lib/auth"
+import { clientAddress, isApp, isDashboard, photoToken } from "@/lib/auth"
 import { problem, readBody, RequestProblem, respond } from "@/lib/http"
 import { type Patient, patientStore } from "@/lib/patients"
+import { photoStore } from "@/lib/photos"
 import { allow } from "@/lib/rate-limit"
 import { joinSchema, limits } from "@/lib/snapshot"
 
@@ -28,9 +29,9 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 /**
- * GET /api/patients (the dashboard): everyone sharing, as {patients}. The ETag changes
- * with every change, and at least once a day so idle people are cleared; a poll sending
- * the same one back gets 304 with no body.
+ * GET /api/patients (the dashboard): everyone sharing, as {patients}, each with the token
+ * that loads their scanned pictures. The ETag changes with every change, and at least once
+ * a day so idle people are cleared; a poll sending the same one back gets 304 with no body.
  */
 export async function GET(request: Request): Promise<Response> {
   return respond(async () => {
@@ -47,8 +48,14 @@ export async function GET(request: Request): Promise<Response> {
     const cutoff = Date.now() - idleDays * day
     const everyone = await store.all()
     const idle = everyone.filter((patient) => Date.parse(patient.updatedAt) < cutoff)
-    if (idle.length > 0) await store.remove(idle.map((patient) => patient.id))
-    const patients = everyone.filter((patient) => !idle.includes(patient))
+    if (idle.length > 0) {
+      const ids = idle.map((patient) => patient.id)
+      await store.remove(ids)
+      await photoStore().removePatients(ids)
+    }
+    const patients = everyone
+      .filter((patient) => !idle.includes(patient))
+      .map((patient) => ({ ...patient, photoToken: photoToken(patient.id) }))
     return Response.json({ patients }, { headers: headers(idle.length > 0 ? await store.version() : version) })
   })
 }

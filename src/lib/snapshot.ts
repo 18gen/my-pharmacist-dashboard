@@ -50,6 +50,8 @@ const timeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Expected a time
 const instant = z.iso.datetime()
 const id = z.string().min(1).max(100)
 const text = z.string().max(limits.text)
+/** A scanned pill's picture, sent on its own (PUT /api/patients/:id/photos/:photoId). */
+const photoId = z.uuid()
 
 export const snapshotSchema = z.object({
   v: z.literal(1),
@@ -60,6 +62,11 @@ export const snapshotSchema = z.object({
   lateWindowMinutes: z.int().min(0).max(24 * 60),
   /** The days covered, oldest first; the last is the phone's today. */
   days: z.array(day).min(1).max(limits.days),
+  /**
+   * The first day the phone has any record of: before it, nothing is known (the app was
+   * new, or reset), so those days aren't "not taken". Absent from older phones.
+   */
+  recordsSince: day.optional(),
   medications: z
     .array(
       z.object({
@@ -83,12 +90,14 @@ export const snapshotSchema = z.object({
         takenAt: instant.optional(),
         /** Taken by a scan rather than ticked by hand. */
         scanned: z.boolean(),
+        /** The pill as that scan saw it, once the phone has sent the picture. */
+        photoId: photoId.optional(),
       }),
     )
     .max(limits.doses),
   /** Medications taken only when needed, on the days they were taken. */
   asNeeded: z
-    .array(z.object({ day, medicationId: id, takenAt: instant, scanned: z.boolean() }))
+    .array(z.object({ day, medicationId: id, takenAt: instant, scanned: z.boolean(), photoId: photoId.optional() }))
     .max(limits.days * limits.medications),
   /** What each scan said about each pill: one entry per scanning session. */
   scans: z
@@ -102,8 +111,10 @@ export const snapshotSchema = z.object({
               outcome: z.enum(outcomes),
               /** For "alreadyTaken": when the dose was taken. */
               takenAt: instant.optional(),
-              /** For "missed" and "tooEarly": the dose's time of day. */
+              /** For "missed" and "tooEarly": the dose's time of day; for "take", the dose it ticked. */
               doseTime: timeOfDay.optional(),
+              /** The pill's picture, once the phone has sent it. */
+              photoId: photoId.optional(),
             }),
           )
           .min(1)
