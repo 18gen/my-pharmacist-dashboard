@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 
-/** A button that asks before doing something that can't be undone: Reset demo, Remove. */
+/** A button that asks before doing something that can't be undone: Reset demo. */
 export function ConfirmAction({
   label,
   title,
@@ -24,21 +24,23 @@ export function ConfirmAction({
   onConfirm,
   variant = "outline",
   size = "default",
+  className,
 }: {
   label: string
   title: string
   description: string
-  /** The destructive button's word: "Reset", "Remove". */
+  /** The destructive button's word: "Reset". */
   confirm: string
   onConfirm: () => void
   variant?: ComponentProps<typeof Button>["variant"]
   size?: ComponentProps<typeof Button>["size"]
+  className?: string
 }) {
   // AlertDialogAction is a plain button here, so the dialog is closed by hand.
   const [open, setOpen] = useState(false)
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={<Button variant={variant} size={size} />}>{label}</AlertDialogTrigger>
+      <AlertDialogTrigger render={<Button variant={variant} size={size} className={className} />}>{label}</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

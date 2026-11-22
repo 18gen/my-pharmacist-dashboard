@@ -2,13 +2,15 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Light only, like the app: nothing sets .dark, so shadcn's dark: styles never apply. */
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
+  /* The system's fonts, as the app uses them: SF Pro on Apple devices. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
   /* Headings in the system serif, like the app's titles (New York on Apple devices). */
   --font-heading: ui-serif, "New York", Georgia, "Times New Roman", serif;
   /* What a dose or scan was, in the app's colours: see "Status" in :root. */
@@ -20,6 +22,9 @@
   --color-caution-fill: var(--caution-fill);
   --color-due: var(--due);
   --color-due-fill: var(--due-fill);
+  --color-late: var(--late);
+  --color-late-fill: var(--late-fill);
+  --color-edge: var(--edge);
   /* Something that changed since the dashboard last looked: a ring that fades. */
   --animate-fresh: fresh 2.4s ease-out;
   @keyframes fresh {
@@ -98,6 +103,11 @@
   --caution-fill: #fcebbd;
   --due: #1c4fa8;
   --due-fill: #e3ebf8;
+  /* A dose whose time passed with no tick: the app's "Not taken yet". */
+  --late: #a84200;
+  --late-fill: #fbeadf;
+  /* The thin warm edge of a card lifted off the page (Palette.raisedEdge). */
+  --edge: #ccbda8;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -114,57 +124,15 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-/* The app is light only; this is the same paper at night, as the TestFlight pages have it. */
-.dark {
-  --background: #1a120e;
-  --foreground: #fff7e6;
-  --card: #241a15;
-  --card-foreground: #fff7e6;
-  --popover: #241a15;
-  --popover-foreground: #fff7e6;
-  --primary: #fff7e6;
-  --primary-foreground: #21140f;
-  --secondary: #33261f;
-  --secondary-foreground: #fff7e6;
-  --muted: #33261f;
-  --muted-foreground: #cdbba8;
-  --accent: #33261f;
-  --accent-foreground: #fff7e6;
-  --destructive: #ff8f86;
-  --border: #4a3a30;
-  --input: #5a483c;
-  --ring: #8fb4ff;
-  --ok: #7fcf93;
-  --ok-fill: #1f3324;
-  --danger: #ff8f86;
-  --danger-fill: #3d1c1a;
-  --caution: #e8b65a;
-  --caution-fill: #3a2c10;
-  --due: #8fb4ff;
-  --due-fill: #1b2a45;
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+    color-scheme: light;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }

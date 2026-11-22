@@ -2,21 +2,24 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Smartphone } from "lucide-react"
-import { useMemo, useSyncExternalStore } from "react"
+import { useMemo, useState, useSyncExternalStore } from "react"
 
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { useNow } from "@/hooks/use-now"
-import { fetchPatients, KeyRejected, removePatient, resetDemo } from "@/lib/api"
-import { patientCards } from "@/lib/card"
+import { fetchPatients, KeyRejected, resetDemo } from "@/lib/api"
+import { buildBoard, dayEvents, type Order, orders, quietDay } from "@/lib/board"
 import { currentKey, subscribeToKey } from "@/lib/dashboard-key"
 
+import { BoardTable, type Selection } from "./board-table"
+import { DayPanel, type OpenDay } from "./day-panel"
 import { FreshProvider, keysOf, useFresh } from "./fresh"
 import { KeyGate } from "./key-gate"
-import { PatientCard, WaitingCard } from "./patient-card"
 import { TopBar } from "./top-bar"
 
 /** How often the dashboard asks for changes. */
 const pollInterval = 2000
+/** Where this browser remembers the order chosen. */
+const orderKey = "my-pharmacist.dashboard-order"
 
 /** The page: the key first, then everyone sharing. */
 export function Dashboard() {
@@ -35,63 +38,120 @@ function Board({ dashboardKey }: { dashboardKey: string }) {
     refetchInterval: pollInterval,
     retry: false,
   })
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["patients"] })
-  const reset = useMutation({ mutationFn: () => resetDemo(dashboardKey), onSettled: refresh })
-  const remove = useMutation({ mutationFn: (id: string) => removePatient(dashboardKey, id), onSettled: refresh })
+  const reset = useMutation({
+    mutationFn: () => resetDemo(dashboardKey),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["patients"] }),
+  })
+
+  const [order, setOrder] = useState<Order>(savedOrder)
+  const [folded, setFolded] = useState<ReadonlySet<string>>(new Set())
+  const [selection, setSelection] = useState<Selection | null>(null)
 
   const now = useNow()
-  const cards = useMemo(() => (patients.data ? patientCards(patients.data, now) : null), [patients.data, now])
-  const fresh = useFresh(useMemo(() => (cards ? keysOf(cards) : null), [cards]))
+  const board = useMemo(() => (patients.data ? buildBoard(patients.data, now, order) : null), [patients.data, now, order])
+  const fresh = useFresh(useMemo(() => (board ? keysOf(board.people) : null), [board]))
 
   if (patients.error instanceof KeyRejected) return <KeyGate rejected />
 
   const status = patients.isError ? "reconnecting" : patients.isSuccess ? "live" : "connecting"
+  const open = openDay(selection, board, patients.data ?? [], now)
+  const chooseOrder = (next: Order) => {
+    setOrder(next)
+    try {
+      window.localStorage.setItem(orderKey, next)
+    } catch {
+      // Not remembered (a private window): it still applies until the page closes.
+    }
+  }
+
   return (
-    <div className="mx-auto flex min-h-svh w-full max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto flex min-h-svh w-full max-w-[1240px] flex-col gap-5 px-4 py-7 sm:px-6">
       <TopBar
-        sharing={cards?.length ?? null}
         status={status}
         resetError={reset.error ? reset.error.message : null}
-        onReset={() => reset.mutate()}
+        onReset={() => {
+          setSelection(null)
+          reset.mutate()
+        }}
       />
-      <main className="flex-1">
-        {cards && cards.length === 0 && <NoOneYet />}
-        {cards && cards.length > 0 && (
+      <main className="flex flex-1 flex-wrap items-start gap-5">
+        {board && board.people.length === 0 && <NoOneYet />}
+        {board && board.people.length > 0 && (
           <FreshProvider value={fresh}>
-            <div className="flex flex-col gap-6">
-              {/* People who joined but whose phone hasn't sent anything yet: small, above the rest. */}
-              {cards.some((card) => card.waiting) && (
-                <div className="flex flex-wrap gap-3">
-                  {cards
-                    .filter((card) => card.waiting)
-                    .map((card) => (
-                      <WaitingCard key={card.id} card={card} onRemove={(id) => remove.mutate(id)} />
-                    ))}
-                </div>
-              )}
-              <div className="grid grid-cols-1 items-start gap-6 min-[1100px]:grid-cols-2">
-                {cards
-                  .filter((card) => !card.waiting)
-                  .map((card) => (
-                    <PatientCard key={card.id} card={card} now={now} onRemove={(id) => remove.mutate(id)} />
-                  ))}
-              </div>
-            </div>
+            <section
+              aria-label="Doses this week"
+              className="max-w-full min-w-0 flex-[0_1_auto] rounded-3xl border border-edge bg-card px-4 pt-3 pb-4 shadow-[0_2px_3px_rgba(33,20,15,0.10)]"
+            >
+              <BoardTable
+                board={board}
+                order={order}
+                onOrder={chooseOrder}
+                now={now}
+                folded={folded}
+                onFold={(id) => setFolded((before) => toggled(before, id))}
+                selection={open ? selection : null}
+                onSelect={(chosen) =>
+                  setSelection((before) =>
+                    before?.personId === chosen.personId && before.day === chosen.day ? null : chosen,
+                  )
+                }
+              />
+            </section>
+            <DayPanel open={open} onClose={() => setSelection(null)} className="min-w-0 flex-[1_1_300px] lg:sticky lg:top-4" />
           </FreshProvider>
         )}
       </main>
-      <footer className="border-t pt-4 text-xs text-muted-foreground">
-        A demo with a fictional pharmacy. Records are deleted when a phone stops sharing, on Reset demo, or after 14
-        days without updates. The pharmacy isn&apos;t alerted about anything; people still call their pharmacist if
-        they&apos;re unsure about a dose.
+      <footer className="flex flex-col gap-1.5 px-1 text-[15px] text-muted-foreground">
+        <p>Scanned doses show the pill as the scan saw it; a ✓ was ticked by hand; an empty box wasn&apos;t taken.</p>
+        <p className="text-sm">
+          A demo with a fictional pharmacy. Records and pictures are deleted on Reset demo, when a phone stops sharing,
+          or after 14 days without updates. The pharmacy isn&apos;t alerted; people still call their pharmacist if
+          they&apos;re unsure about a dose.
+        </p>
       </footer>
     </div>
   )
 }
 
+/** The order this browser chose last time; latest update first otherwise. */
+function savedOrder(): Order {
+  try {
+    const saved = window.localStorage.getItem(orderKey)
+    return orders.find((order) => order === saved) ?? "updated"
+  } catch {
+    return "updated"
+  }
+}
+
+function toggled(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
+  const next = new Set(set)
+  if (!next.delete(id)) next.add(id)
+  return next
+}
+
+/** The day the panel shows, while its person is still sharing. */
+function openDay(
+  selection: Selection | null,
+  board: ReturnType<typeof buildBoard> | null,
+  patients: NonNullable<Parameters<typeof buildBoard>[0]>,
+  now: Date,
+): OpenDay | null {
+  if (!selection || !board) return null
+  const person = board.people.find((entry) => entry.id === selection.personId)
+  const patient = patients.find((entry) => entry.id === selection.personId)
+  const column = board.columns.find((entry) => entry.day === selection.day)
+  if (!person || !patient || !column) return null
+  return {
+    name: person.name,
+    day: column.long,
+    events: dayEvents(patient, selection.day, now),
+    quiet: quietDay(patient, selection.day),
+  }
+}
+
 function NoOneYet() {
   return (
-    <Empty className="border border-dashed py-16">
+    <Empty className="w-full border border-dashed border-edge py-16">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <Smartphone />
