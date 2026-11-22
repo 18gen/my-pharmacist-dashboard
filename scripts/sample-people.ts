@@ -3,20 +3,33 @@ import type { Snapshot } from "@/lib/snapshot"
 /**
  * Made-up people for trying the dashboard without phones, built around `now` in this
  * computer's time zone, as their phones would send them:
- * - Maria: the app's sample week (the iOS "Reset demo → With a sample week"), a dose due now;
- * - Ken: every dose taken;
- * - Aiko: this morning's doses missed, and a pill the app didn't know;
+ * - Maria: the app's sample week (the iOS "Reset demo → With a sample week"), a dose due
+ *   now; made by the app, so no scan pictures: her boxes show the medicine's own;
+ * - Ken: every dose taken, nearly all by a scan, with the scans' pictures;
+ * - Aiko: this morning's doses missed, and a pill the app didn't know, with its picture;
+ * - Sam: started today, so the days before show "no record yet";
  * - a second Maria who joined but whose phone hasn't sent anything yet.
  */
 export interface SamplePerson {
   name: string
   snapshot: Snapshot | null
+  /** Scan pictures to send before the snapshot: which fixture (scripts/fixtures) under which ID. */
+  photos: SamplePhoto[]
+}
+
+export interface SamplePhoto {
+  photoId: string
+  /** "exemestane-25-scan": scripts/fixtures/exemestane-25-scan.jpg. */
+  fixture: string
 }
 
 type Medication = Snapshot["medications"][number]
 type Scan = Snapshot["scans"][number]
-/** How a dose was taken: minutes after its time, and whether by a scan; null if it wasn't. */
-type Taken = { after: number; scanned: boolean } | null
+/**
+ * How a dose was taken: minutes after its time, whether by a scan, and the scan's picture
+ * (a fixture's name); null if it wasn't.
+ */
+type Taken = { after: number; scanned: boolean; photo?: string } | null
 
 const minute = 60 * 1000
 const hour = 60 * minute
@@ -25,10 +38,11 @@ const delays = [3, 11, 6, 18, 9, 4, 22, 7]
 
 export function samplePeople(now: Date): SamplePerson[] {
   return [
-    { name: "Ken", snapshot: ken(now) },
-    { name: "Aiko", snapshot: aiko(now) },
-    { name: "Maria", snapshot: maria(now) },
-    { name: "Maria", snapshot: null },
+    { name: "Ken", ...ken(now) },
+    { name: "Aiko", ...aiko(now) },
+    { name: "Maria", snapshot: maria(now), photos: [] },
+    { name: "Sam", ...sam(now) },
+    { name: "Maria", snapshot: null, photos: [] },
   ]
 }
 
@@ -48,7 +62,7 @@ export function maria(now: Date): Snapshot {
     medication("allopurinol-300", "Allopurinol", "300 mg", [second]),
     medication("ondansetron-8", "Ondansetron", "8 mg", [], true),
   ]
-  return snapshot(now, medications, {
+  return build(now, medications, {
     taken: (day, id, time, index) => {
       if (day === 0) return fromNoon && time === first ? { after: 4, scanned: true } : null
       if (day === -4 && time === second) return null
@@ -66,22 +80,31 @@ export function maria(now: Date): Snapshot {
       }),
       scan(new Date(dayAt(-1, second).getTime() + hour), null, "unknown"),
     ],
-  })
+  }).snapshot
 }
 
-function ken(now: Date): Snapshot {
-  return snapshot(
+function ken(now: Date): Omit<SamplePerson, "name"> {
+  const photos: Record<string, string> = {
+    "exemestane-25": "exemestane-25-scan",
+    "metoclopramide-10": "metoclopramide-10-scan",
+  }
+  return build(
     now,
     [
       medication("exemestane-25", "Exemestane", "25 mg", ["09:00"]),
       medication("metoclopramide-10", "Metoclopramide", "10 mg", ["09:00", "21:00"]),
     ],
-    { taken: (_day, _id, _time, index) => ({ after: delays[index % delays.length] ?? 5, scanned: true }) },
+    {
+      taken: (_day, id, _time, index) => {
+        const scanned = index % 7 !== 3
+        return { after: delays[index % delays.length] ?? 5, scanned, photo: scanned ? photos[id] : undefined }
+      },
+    },
   )
 }
 
-function aiko(now: Date): Snapshot {
-  return snapshot(
+function aiko(now: Date): Omit<SamplePerson, "name"> {
+  return build(
     now,
     [
       medication("capecitabine-500", "Capecitabine", "500 mg", ["07:30", "19:30"]),
@@ -93,9 +116,17 @@ function aiko(now: Date): Snapshot {
         if (day === -3 && id === "capecitabine-500" && time === "19:30") return null
         return { after: delays[index % delays.length] ?? 5, scanned: index % 3 !== 0 }
       },
-      scans: (dayAt) => [scan(new Date(dayAt(0, "10:05").getTime()), null, "unknown")],
+      scans: (dayAt) => [scan(dayAt(0, "10:05"), null, "unknown", { photo: "dexamethasone-1-5-scan" })],
     },
   )
+}
+
+/** Shares from a phone set up today: nothing is known before this morning. */
+function sam(now: Date): Omit<SamplePerson, "name"> {
+  return build(now, [medication("exemestane-25", "Exemestane", "25 mg", ["09:00"])], {
+    since: 0,
+    taken: (day) => (day === 0 ? { after: 6, scanned: true, photo: "exemestane-25-scan" } : null),
+  })
 }
 
 // MARK: Building a snapshot
@@ -104,26 +135,37 @@ function medication(id: string, name: string, strength: string, times: string[],
   return { id, name, strength, times, asNeeded }
 }
 
-function scan(at: Date, medicationId: string | null, outcome: Scan["pills"][number]["outcome"], extra: { takenAt?: Date; doseTime?: string } = {}): Scan {
+/** A scan waiting for its picture's ID, which `build` gives it. */
+type PlannedScan = Scan & { photo?: string }
+
+function scan(
+  at: Date,
+  medicationId: string | null,
+  outcome: Scan["pills"][number]["outcome"],
+  extra: { takenAt?: Date; doseTime?: string; photo?: string } = {},
+): PlannedScan {
   const pill: Scan["pills"][number] = { medicationId, outcome }
   if (extra.takenAt) pill.takenAt = extra.takenAt.toISOString()
   if (extra.doseTime) pill.doseTime = extra.doseTime
-  return { at: at.toISOString(), pills: [pill] }
+  return { at: at.toISOString(), pills: [pill], photo: extra.photo }
 }
 
 /**
  * The last 7 days, today last, with every scheduled dose. Nothing after `now` is
  * included: a dose taken "later" today, an as-needed tablet or a scan still to come.
+ * Each scan with a picture gets an ID, and the picture is listed to be sent first.
  */
-function snapshot(
+function build(
   now: Date,
   medications: Medication[],
   plan: {
     taken: (day: number, medicationID: string, time: string, index: number) => Taken
     asNeeded?: { day: number; medicationId: string; time: string; scanned: boolean }[]
-    scans?: (dayAt: (day: number, time: string) => Date) => Scan[]
+    scans?: (dayAt: (day: number, time: string) => Date) => PlannedScan[]
+    /** The first day with a record, counted from today: the week before by default. */
+    since?: number
   },
-): Snapshot {
+): { snapshot: Snapshot; photos: SamplePhoto[] } {
   const today = new Date(now)
   today.setHours(0, 0, 0, 0)
   const dayAt = (day: number, time: string) => {
@@ -135,6 +177,13 @@ function snapshot(
   }
   const days = [-6, -5, -4, -3, -2, -1, 0]
   const past = (date: Date) => date.getTime() <= now.getTime()
+  const photos: SamplePhoto[] = []
+  const photoFor = (fixture: string | undefined) => {
+    if (!fixture) return undefined
+    const photoId = crypto.randomUUID()
+    photos.push({ photoId, fixture })
+    return photoId
+  }
 
   let index = 0
   const doses: Snapshot["doses"] = []
@@ -154,6 +203,8 @@ function snapshot(
         if (takenAt && taken && past(takenAt)) {
           dose.takenAt = takenAt.toISOString()
           dose.scanned = taken.scanned
+          const photoId = taken.scanned ? photoFor(taken.photo) : undefined
+          if (photoId) dose.photoId = photoId
         }
         doses.push(dose)
       }
@@ -165,17 +216,28 @@ function snapshot(
     .filter(({ at }) => past(at))
     .map(({ entry, at }) => ({ day: dayKey(at), medicationId: entry.medicationId, takenAt: at.toISOString(), scanned: entry.scanned }))
 
+  const scans = (plan.scans?.(dayAt) ?? [])
+    .filter((entry) => Date.parse(entry.at) <= now.getTime())
+    .map(({ photo, ...entry }): Scan => {
+      const photoId = photoFor(photo)
+      return photoId ? { ...entry, pills: entry.pills.map((pill) => ({ ...pill, photoId })) } : entry
+    })
+
   return {
-    v: 1,
-    sentAt: now.toISOString(),
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    earlyWindowMinutes: 60,
-    lateWindowMinutes: 120,
-    days: days.map((day) => dayKey(dayAt(day, "12:00"))),
-    medications,
-    doses,
-    asNeeded,
-    scans: (plan.scans?.(dayAt) ?? []).filter((entry) => Date.parse(entry.at) <= now.getTime()),
+    snapshot: {
+      v: 1,
+      sentAt: now.toISOString(),
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      earlyWindowMinutes: 60,
+      lateWindowMinutes: 120,
+      days: days.map((day) => dayKey(dayAt(day, "12:00"))),
+      recordsSince: dayKey(dayAt(plan.since ?? -6, "12:00")),
+      medications,
+      doses,
+      asNeeded,
+      scans,
+    },
+    photos,
   }
 }
 
