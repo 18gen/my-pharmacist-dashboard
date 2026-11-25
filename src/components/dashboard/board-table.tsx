@@ -1,7 +1,7 @@
 "use client"
 
 import { ChevronDown } from "lucide-react"
-import { useEffect, useRef } from "react"
+import { type PointerEvent, useEffect, useRef, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -154,6 +154,15 @@ function Person({
   onSelect: (day: string) => void
 }) {
   const glows = useGlow("person", person.id)
+  // The day under the mouse: its whole column lights up for this person, the band a click
+  // would open. Found from the box under the pointer, so moving between boxes of one day
+  // keeps it lit; touch has no hover, so taps leave it alone.
+  const [hoveredDay, setHoveredDay] = useState<string | null>(null)
+  const hover = (event: PointerEvent<HTMLElement>) => {
+    if (event.pointerType === "touch") return
+    const box = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-day]") : null
+    setHoveredDay(box?.dataset.day ?? null)
+  }
   const rowsId = `rows-${person.id}`
   const recent = !person.waiting && order !== "joined" && now.getTime() - Date.parse(person.updatedAt) < freshFor
   const sub = person.waiting
@@ -183,7 +192,7 @@ function Person({
           </TableHead>
         </TableRow>
       </TableBody>
-      <TableBody id={rowsId} hidden={folded}>
+      <TableBody id={rowsId} hidden={folded} onPointerOver={hover} onPointerLeave={() => setHoveredDay(null)}>
         {person.waiting && (
           <TableRow className="border-0 hover:bg-transparent">
             <TableCell colSpan={board.columns.length + 1} className="px-1 pb-3 text-base text-muted-foreground">
@@ -216,6 +225,7 @@ function Person({
                   column={board.columns[column]!}
                   cell={cell}
                   selected={selectedDay === cell.day}
+                  hovered={hoveredDay === cell.day}
                   first={index === 0}
                   last={index === person.rows.length - 1}
                   onSelect={() => onSelect(cell.day)}

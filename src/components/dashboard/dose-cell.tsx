@@ -22,6 +22,7 @@ export function DoseCell({
   column,
   cell,
   selected,
+  hovered,
   first,
   last,
   onSelect,
@@ -32,7 +33,9 @@ export function DoseCell({
   cell: Cell
   /** Its day is the one open in the panel, for this person. */
   selected: boolean
-  /** The person's first and last rows: the selected day's band is rounded there. */
+  /** The mouse is over one of this person's boxes for its day: the band shows faintly. */
+  hovered: boolean
+  /** The person's first and last rows: the day's band is rounded there. */
   first: boolean
   last: boolean
   onSelect: () => void
@@ -48,10 +51,11 @@ export function DoseCell({
       onClick={onSelect}
       aria-label={label}
       aria-pressed={selected}
+      data-day={cell.day}
       className={cn(
         "relative flex h-full w-full cursor-pointer flex-col items-center gap-0.5 px-0 pt-1.5 pb-1 outline-none",
         "focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring/60",
-        selected ? "bg-secondary" : "hover:bg-secondary/50",
+        selected ? "bg-secondary" : hovered && "bg-secondary/50",
         first && "rounded-t-xl",
         last && "rounded-b-xl",
       )}
