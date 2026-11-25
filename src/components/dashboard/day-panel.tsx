@@ -23,16 +23,17 @@ export interface OpenDay {
 }
 
 /**
- * What happened on a day, for one person, in the order it happened: the day pointed at
- * ("preview"), else the day clicked ("pinned"), which stays when the pointer leaves. Beside
- * the table, or under it on a narrow screen, where a newly pinned day scrolls into view
- * (never a pointed-at one, so moving the mouse doesn't move the page).
+ * What happened on a day, for one person, in the order it happened. Beside the table it
+ * shows the day pointed at ("preview"), else the day clicked ("pinned"), which stays when
+ * the pointer leaves. Under the table (a narrower window) it shows only the day clicked,
+ * which scrolls into view.
  */
 export function DayPanel({
   open,
   mode,
   kept,
   pinnedKey,
+  beside,
   onClose,
   className,
 }: {
@@ -42,14 +43,18 @@ export function DayPanel({
   kept: string | null
   /** Changes when another day is pinned. */
   pinnedKey: string | null
+  /** Beside the table, where pointing at a day shows it here. */
+  beside: boolean
   onClose: () => void
   className?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (!pinnedKey || !ref.current || !window.matchMedia("(max-width: 1023px)").matches) return
+    if (!pinnedKey || !ref.current || beside) return
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ref.current.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "nearest" })
+    // Only a newly pinned day scrolls, not the window growing past the side-by-side width.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pinnedKey])
 
   return (
@@ -108,7 +113,9 @@ export function DayPanel({
                 )
               ) : (
                 <>
-                  <span className="pointer-coarse:hidden">Stays here when you move away. Click the day again, or the ×, to close it.</span>
+                  <span className="pointer-coarse:hidden">
+                    {beside && "Stays here when you move away. "}Click the day again, or the ×, to close it.
+                  </span>
                   <span className="hidden pointer-coarse:inline">Tap the day again, or the ×, to close it.</span>
                 </>
               )}
@@ -118,7 +125,11 @@ export function DayPanel({
       ) : (
         <CardContent className="px-5">
           <p className="text-[17px] leading-snug text-muted-foreground">
-            <span className="pointer-coarse:hidden">Point at a day in someone&apos;s row to see what happened. Click it to keep it here.</span>
+            <span className="pointer-coarse:hidden">
+              {beside
+                ? "Point at a day in someone’s row to see what happened. Click it to keep it here."
+                : "Click a day in someone’s row to see what happened."}
+            </span>
             <span className="hidden pointer-coarse:inline">Tap a day in someone&apos;s row to see what happened.</span>
           </p>
         </CardContent>

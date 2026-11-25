@@ -2,7 +2,15 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Smartphone } from "lucide-react"
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react"
 
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { useNow } from "@/hooks/use-now"
@@ -91,6 +99,8 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
     [patients.data, samples, everyone, now, order],
   )
   const fresh = useFresh(useMemo(() => (board ? keysOf(board.people) : null), [board]))
+  const main = useRef<HTMLElement>(null)
+  const beside = useBeside(main)
 
   const refused = patients.error instanceof KeyRejected
   useEffect(() => {
@@ -108,7 +118,11 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
         : "connecting"
   const pinned = openDay(selection, board, everyone, now)
   const pointed = openDay(hovered, board, everyone, now)
-  const previewing = pointed !== null && !(hovered?.personId === selection?.personId && hovered?.day === selection?.day)
+  // The panel shows the day pointed at only beside the table. Under it (a narrower window),
+  // each day would change the panel's height and push the page about: there it changes on a
+  // click, and the day pointed at only lights its band.
+  const previewing =
+    beside && pointed !== null && !(hovered?.personId === selection?.personId && hovered?.day === selection?.day)
   const chooseOrder = (next: Order) => {
     setOrder(next)
     remember(orderKey, next)
@@ -131,7 +145,7 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
           reset.mutate()
         }}
       />
-      <main className="flex flex-1 flex-wrap items-start gap-5">
+      <main ref={main} className="flex flex-1 flex-wrap items-start gap-5">
         {board && board.people.length === 0 && <NoOneYet />}
         {board && board.people.length > 0 && (
           <FreshProvider value={fresh}>
@@ -161,6 +175,7 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
               mode={previewing ? "preview" : "pinned"}
               kept={previewing && pinned ? `${pinned.name}’s ${pinned.weekday}` : null}
               pinnedKey={pinned && selection ? `${selection.personId}|${selection.day}` : null}
+              beside={beside}
               onClose={() => setSelection(null)}
               className="min-w-0 flex-[1_1_300px] lg:sticky lg:top-4"
             />
@@ -169,6 +184,33 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
       </main>
     </div>
   )
+}
+
+/**
+ * Whether the day panel sits beside the table rather than under it, as the page's width
+ * allows. Read from the page on each render, and again when `main` changes size or what it
+ * holds (the table and panel appear with the first person).
+ */
+function useBeside(main: RefObject<HTMLElement | null>): boolean {
+  const [subscribe] = useState(() => (onChange: () => void) => {
+    const element = main.current
+    if (!element) return () => {}
+    const sizes = new ResizeObserver(onChange)
+    sizes.observe(element)
+    const children = new MutationObserver(onChange)
+    children.observe(element, { childList: true })
+    return () => {
+      sizes.disconnect()
+      children.disconnect()
+    }
+  })
+  return useSyncExternalStore(subscribe, () => sideBySide(main.current), () => false)
+}
+
+/** The table, then the panel, are `main`'s first two children: beside when the panel starts right of the table. */
+function sideBySide(main: HTMLElement | null): boolean {
+  const [table, panel] = main ? Array.from(main.children) : []
+  return !!table && !!panel && panel.getBoundingClientRect().left >= table.getBoundingClientRect().right
 }
 
 /** The order this browser chose last time; latest update first otherwise. */
