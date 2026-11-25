@@ -7,12 +7,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { saveKey } from "@/lib/dashboard-key"
 
-/** Asks for the dashboard's key: not an account, one key shared by the demo team. */
-export function KeyGate({ rejected }: { rejected: boolean }) {
+/**
+ * Asks for the dashboard's key: not an account, one key shared by the demo team.
+ * `onSave` runs once the key is kept, so the page tries it even if it is the one refused.
+ */
+export function KeyGate({ rejected, onSave }: { rejected: boolean; onSave: () => void }) {
   const [key, setKey] = useState("")
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (key.trim()) saveKey(key)
+    if (!key.trim()) return
+    saveKey(key)
+    onSave()
   }
   return (
     <main className="grid min-h-svh place-items-center px-4">
@@ -34,6 +39,7 @@ export function KeyGate({ rejected }: { rejected: boolean }) {
               id="dashboard-key"
               type="password"
               autoComplete="off"
+              autoFocus
               value={key}
               onChange={(event) => setKey(event.target.value)}
               aria-invalid={rejected || undefined}

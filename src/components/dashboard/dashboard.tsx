@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Smartphone } from "lucide-react"
-import { useMemo, useState, useSyncExternalStore } from "react"
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
 
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { useNow } from "@/hooks/use-now"
@@ -25,12 +25,18 @@ const orderKey = "my-pharmacist.dashboard-order"
 export function Dashboard() {
   // Undefined while rendered on the server, which can't see this browser's key.
   const key = useSyncExternalStore(subscribeToKey, currentKey, () => undefined)
+  // The key the server refused. The board (and its polling) is gone while the page asks
+  // for another: polling on would swap the form for a new, empty one every 2 seconds, as
+  // TanStack Query clears a query's error each time it fetches before any data.
+  const [refused, setRefused] = useState<string | null>(null)
   if (key === undefined) return null
-  if (key === null) return <KeyGate rejected={false} />
-  return <Board dashboardKey={key} />
+  if (key === null || key === refused) {
+    return <KeyGate rejected={key !== null} onSave={() => setRefused(null)} />
+  }
+  return <Board dashboardKey={key} onRefused={() => setRefused(key)} />
 }
 
-function Board({ dashboardKey }: { dashboardKey: string }) {
+function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: () => void }) {
   const queryClient = useQueryClient()
   const patients = useQuery({
     queryKey: ["patients", dashboardKey],
@@ -51,9 +57,20 @@ function Board({ dashboardKey }: { dashboardKey: string }) {
   const board = useMemo(() => (patients.data ? buildBoard(patients.data, now, order) : null), [patients.data, now, order])
   const fresh = useFresh(useMemo(() => (board ? keysOf(board.people) : null), [board]))
 
-  if (patients.error instanceof KeyRejected) return <KeyGate rejected />
+  const refused = patients.error instanceof KeyRejected
+  useEffect(() => {
+    if (refused) onRefused()
+  }, [refused, onRefused])
+  if (refused) return null
 
-  const status = patients.isError ? "reconnecting" : patients.isSuccess ? "live" : "connecting"
+  // errorUpdateCount survives the refetches that clear the error before any data, so the
+  // label doesn't swap between Connecting and Reconnecting every poll while unreachable.
+  const status =
+    patients.isError || (patients.isPending && patients.errorUpdateCount > 0)
+      ? "reconnecting"
+      : patients.isSuccess
+        ? "live"
+        : "connecting"
   const open = openDay(selection, board, patients.data ?? [], now)
   const chooseOrder = (next: Order) => {
     setOrder(next)
