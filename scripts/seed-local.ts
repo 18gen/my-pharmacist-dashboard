@@ -22,8 +22,9 @@ try {
 } catch {
   // Already in the environment, or no .env.local: checked below.
 }
-const appToken = process.env.APP_TOKEN
-const dashboardKey = process.env.DASHBOARD_KEY
+// Trimmed, as the server trims them (src/lib/auth.ts).
+const appToken = process.env.APP_TOKEN?.trim()
+const dashboardKey = process.env.DASHBOARD_KEY?.trim()
 if (!appToken || !dashboardKey) {
   console.error("Set APP_TOKEN and DASHBOARD_KEY in .env.local (see .env.example).")
   process.exit(1)

@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest"
 
 import { GET as getPhoto, PUT as putPhoto } from "@/app/api/patients/[id]/photos/[photoId]/route"
 import { DELETE, PUT } from "@/app/api/patients/[id]/route"
@@ -49,6 +49,27 @@ beforeAll(() => {
 
 beforeEach(async () => {
   expect((await reset(request("/reset", "POST", asDashboard))).status).toBe(204)
+})
+
+describe("the secrets", () => {
+  afterEach(() => {
+    process.env.APP_TOKEN = appToken
+    process.env.DASHBOARD_KEY = dashboardKey
+  })
+
+  it("still match when set with a newline or spaces around them, as pasted", async () => {
+    process.env.APP_TOKEN = ` ${appToken}\n`
+    process.env.DASHBOARD_KEY = `${dashboardKey}\n`
+    await join("Maria")
+    expect((await everyone()).map((patient) => patient.name)).toEqual(["Maria"])
+  })
+
+  it("refuse everyone when set to only spaces", async () => {
+    process.env.APP_TOKEN = " \n"
+    process.env.DASHBOARD_KEY = " \n"
+    expect((await POST(request("/patients", "POST", { "x-app-token": "" }, { name: "Maria" }))).status).toBe(401)
+    expect((await GET(request("/patients", "GET", { authorization: "Bearer " }))).status).toBe(401)
+  })
 })
 
 describe("joining", () => {
@@ -230,6 +251,20 @@ describe("scanned pictures", () => {
     const id = await join("Maria")
     await reset(request("/reset", "POST", asDashboard))
     expect(await sendPhoto(id, crypto.randomUUID())).toBe(404)
+  })
+
+  it("signs picture links with the key trimmed, as set with a newline after it", async () => {
+    const id = await join("Maria")
+    const photoId = crypto.randomUUID()
+    await sendPhoto(id, photoId)
+    const token = await tokenOf(id)
+    process.env.DASHBOARD_KEY = `${dashboardKey}\n`
+    try {
+      expect(await tokenOf(id)).toBe(token)
+      expect((await loadPhoto(id, photoId, token)).status).toBe(200)
+    } finally {
+      process.env.DASHBOARD_KEY = dashboardKey
+    }
   })
 
   it("forgets a person's pictures when they stop sharing, or the demo is reset", async () => {

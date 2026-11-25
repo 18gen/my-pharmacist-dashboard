@@ -19,14 +19,23 @@ export function sameSecret(given: string, expected: string): boolean {
   return difference === 0 && expected.length > 0
 }
 
+/**
+ * A secret as set, without spaces or line breaks around it: a value pasted into Vercel
+ * with the newline `openssl rand -hex 32 | pbcopy` copies would otherwise refuse
+ * everyone, as the app and the dashboard send theirs trimmed.
+ */
+function secret(name: "APP_TOKEN" | "DASHBOARD_KEY"): string {
+  return (process.env[name] ?? "").trim()
+}
+
 export function isApp(request: Request): boolean {
-  return sameSecret(request.headers.get("x-app-token") ?? "", process.env.APP_TOKEN ?? "")
+  return sameSecret(request.headers.get("x-app-token") ?? "", secret("APP_TOKEN"))
 }
 
 export function isDashboard(request: Request): boolean {
   const header = request.headers.get("authorization") ?? ""
   const key = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : ""
-  return sameSecret(key, process.env.DASHBOARD_KEY ?? "")
+  return sameSecret(key, secret("DASHBOARD_KEY"))
 }
 
 /**
@@ -36,7 +45,7 @@ export function isDashboard(request: Request): boolean {
  * until the person is gone (Reset demo, stop sharing); empty without a key.
  */
 export function photoToken(patientId: string): string {
-  const key = process.env.DASHBOARD_KEY ?? ""
+  const key = secret("DASHBOARD_KEY")
   if (!key) return ""
   return createHmac("sha256", key).update(`photos:${patientId}`).digest("base64url")
 }
