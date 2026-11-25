@@ -1,6 +1,6 @@
 "use client"
 
-import { X } from "lucide-react"
+import { Pin, X } from "lucide-react"
 import { useEffect, useRef } from "react"
 
 import { Button } from "@/components/ui/button"
@@ -15,23 +15,42 @@ export interface OpenDay {
   name: string
   /** "Today, Saturday, Nov 21". */
   day: string
+  /** "Saturday", or "today": for "Helen’s Saturday comes back". */
+  weekday: string
   events: DayEvent[]
   /** Said when there are no events: why the day is quiet. */
   quiet: string
 }
 
 /**
- * What happened on the day clicked, for that person, in the order it happened: beside the
- * table, or under it on a narrow screen, where it scrolls into view when a day is opened.
+ * What happened on a day, for one person, in the order it happened: the day pointed at
+ * ("preview"), else the day clicked ("pinned"), which stays when the pointer leaves. Beside
+ * the table, or under it on a narrow screen, where a newly pinned day scrolls into view
+ * (never a pointed-at one, so moving the mouse doesn't move the page).
  */
-export function DayPanel({ open, onClose, className }: { open: OpenDay | null; onClose: () => void; className?: string }) {
+export function DayPanel({
+  open,
+  mode,
+  kept,
+  pinnedKey,
+  onClose,
+  className,
+}: {
+  open: OpenDay | null
+  mode: "preview" | "pinned"
+  /** While previewing: the pinned day that comes back, "Helen’s Sunday". */
+  kept: string | null
+  /** Changes when another day is pinned. */
+  pinnedKey: string | null
+  onClose: () => void
+  className?: string
+}) {
   const ref = useRef<HTMLDivElement>(null)
-  const which = open ? `${open.name}|${open.day}` : null
   useEffect(() => {
-    if (!which || !ref.current || !window.matchMedia("(max-width: 1023px)").matches) return
+    if (!pinnedKey || !ref.current || !window.matchMedia("(max-width: 1023px)").matches) return
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ref.current.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "nearest" })
-  }, [which])
+  }, [pinnedKey])
 
   return (
     <Card
@@ -42,15 +61,29 @@ export function DayPanel({ open, onClose, className }: { open: OpenDay | null; o
       {open ? (
         <>
           <CardHeader className="px-5">
-            <CardTitle className="font-sans text-[22px] leading-tight font-bold">{open.name}</CardTitle>
+            <CardTitle className="flex flex-wrap items-center gap-2 font-sans text-[22px] leading-tight font-bold">
+              {open.name}
+              {mode === "preview" ? (
+                <span className="inline-flex h-6 items-center rounded-full bg-secondary px-2.5 text-[13px] font-semibold text-muted-foreground">
+                  Preview
+                </span>
+              ) : (
+                <span className="inline-flex h-6 items-center gap-1 rounded-full bg-primary px-2.5 text-[13px] font-semibold text-primary-foreground">
+                  <Pin aria-hidden strokeWidth={2.6} className="size-3" />
+                  Pinned
+                </span>
+              )}
+            </CardTitle>
             <CardDescription className="text-base text-muted-foreground">{open.day}</CardDescription>
-            <CardAction>
-              <Button variant="secondary" size="icon-lg" onClick={onClose} aria-label="Close" className="rounded-full">
-                <X aria-hidden strokeWidth={3} className="size-3.5" />
-              </Button>
-            </CardAction>
+            {mode === "pinned" && (
+              <CardAction>
+                <Button variant="secondary" size="icon-lg" onClick={onClose} aria-label="Unpin this day" className="rounded-full">
+                  <X aria-hidden strokeWidth={3} className="size-3.5" />
+                </Button>
+              </CardAction>
+            )}
           </CardHeader>
-          <CardContent className="px-5">
+          <CardContent className="flex flex-col gap-1 px-5">
             {open.events.length > 0 ? (
               <ul className="flex flex-col">
                 {open.events.map((event, index) => (
@@ -66,11 +99,28 @@ export function DayPanel({ open, onClose, className }: { open: OpenDay | null; o
             ) : (
               <p className="py-1.5 text-base text-muted-foreground">{open.quiet}</p>
             )}
+            <p className="border-t border-border pt-3 text-sm leading-snug text-muted-foreground">
+              {mode === "preview" ? (
+                kept ? (
+                  `Click to keep this day here. Move away and ${kept} comes back.`
+                ) : (
+                  "Click the day to keep it here."
+                )
+              ) : (
+                <>
+                  <span className="pointer-coarse:hidden">Stays here when you move away. Click the day again, or the ×, to close it.</span>
+                  <span className="hidden pointer-coarse:inline">Tap the day again, or the ×, to close it.</span>
+                </>
+              )}
+            </p>
           </CardContent>
         </>
       ) : (
         <CardContent className="px-5">
-          <p className="text-[17px] leading-snug text-muted-foreground">Click a day in someone&apos;s row to see what happened.</p>
+          <p className="text-[17px] leading-snug text-muted-foreground">
+            <span className="pointer-coarse:hidden">Point at a day in someone&apos;s row to see what happened. Click it to keep it here.</span>
+            <span className="hidden pointer-coarse:inline">Tap a day in someone&apos;s row to see what happened.</span>
+          </p>
         </CardContent>
       )}
     </Card>

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Smartphone } from "lucide-react"
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { useNow } from "@/hooks/use-now"
@@ -19,6 +19,8 @@ import { TopBar } from "./top-bar"
 
 /** How often the dashboard asks for changes. */
 const pollInterval = 2000
+/** How long the panel keeps the day pointed at after the pointer leaves it, in ms. */
+const hoverGrace = 150
 /** Where this browser remembers the order chosen, and whether it shows the sample patients. */
 const orderKey = "my-pharmacist.dashboard-order"
 const samplesKey = "my-pharmacist.dashboard-samples"
@@ -54,7 +56,30 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
   const [order, setOrder] = useState<Order>(savedOrder)
   const [samples, setSamples] = useState(savedSamples)
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set())
+  // The day pinned by a click, and the day pointed at, which the panel shows while it's there.
   const [selection, setSelection] = useState<Selection | null>(null)
+  const [hovered, setHovered] = useState<Selection | null>(null)
+  // Leaving one day lets the next arrive first (crossing a gap, or the next person's name),
+  // so the panel doesn't flash back to the pinned day on the way.
+  const leaving = useRef<number | null>(null)
+  const hover = useCallback((next: Selection | null) => {
+    if (leaving.current !== null) window.clearTimeout(leaving.current)
+    leaving.current = null
+    if (next) {
+      setHovered((before) => (before?.personId === next.personId && before.day === next.day ? before : next))
+    } else {
+      leaving.current = window.setTimeout(() => {
+        leaving.current = null
+        setHovered(null)
+      }, hoverGrace)
+    }
+  }, [])
+  useEffect(
+    () => () => {
+      if (leaving.current !== null) window.clearTimeout(leaving.current)
+    },
+    [],
+  )
 
   const now = useNow()
   // Made afresh each minute, so their doses keep being taken as the day goes on.
@@ -81,7 +106,9 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
       : patients.isSuccess
         ? "live"
         : "connecting"
-  const open = openDay(selection, board, everyone, now)
+  const pinned = openDay(selection, board, everyone, now)
+  const pointed = openDay(hovered, board, everyone, now)
+  const previewing = pointed !== null && !(hovered?.personId === selection?.personId && hovered?.day === selection?.day)
   const chooseOrder = (next: Order) => {
     setOrder(next)
     remember(orderKey, next)
@@ -100,6 +127,7 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
         resetError={reset.error ? reset.error.message : null}
         onReset={() => {
           setSelection(null)
+          setHovered(null)
           reset.mutate()
         }}
       />
@@ -118,15 +146,24 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
                 now={now}
                 folded={folded}
                 onFold={(id) => setFolded((before) => toggled(before, id))}
-                selection={open ? selection : null}
+                selection={pinned ? selection : null}
                 onSelect={(chosen) =>
                   setSelection((before) =>
                     before?.personId === chosen.personId && before.day === chosen.day ? null : chosen,
                   )
                 }
+                hovered={pointed ? hovered : null}
+                onHover={hover}
               />
             </section>
-            <DayPanel open={open} onClose={() => setSelection(null)} className="min-w-0 flex-[1_1_300px] lg:sticky lg:top-4" />
+            <DayPanel
+              open={previewing ? pointed : pinned}
+              mode={previewing ? "preview" : "pinned"}
+              kept={previewing && pinned ? `${pinned.name}’s ${pinned.weekday}` : null}
+              pinnedKey={pinned && selection ? `${selection.personId}|${selection.day}` : null}
+              onClose={() => setSelection(null)}
+              className="min-w-0 flex-[1_1_300px] lg:sticky lg:top-4"
+            />
           </FreshProvider>
         )}
       </main>
@@ -182,6 +219,8 @@ function openDay(
   return {
     name: person.name,
     day: column.long,
+    // "Sunday" from "Sunday, Nov 22"; "today" for today's column.
+    weekday: column.isToday ? "today" : (column.long.split(",")[0] ?? column.weekday),
     events: dayEvents(patient, selection.day, now),
     quiet: quietDay(patient, selection.day),
   }

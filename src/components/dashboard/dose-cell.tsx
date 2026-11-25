@@ -51,7 +51,6 @@ export function DoseCell({
       onClick={onSelect}
       aria-label={label}
       aria-pressed={selected}
-      data-day={cell.day}
       className={cn(
         "relative flex h-full w-full cursor-pointer flex-col items-center gap-0.5 px-0 pt-1.5 pb-1 outline-none",
         "focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring/60",

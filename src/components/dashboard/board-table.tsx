@@ -1,7 +1,7 @@
 "use client"
 
 import { ChevronDown } from "lucide-react"
-import { type PointerEvent, useEffect, useRef, useState } from "react"
+import { type PointerEvent, useEffect, useRef } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -36,6 +36,8 @@ export function BoardTable({
   onFold,
   selection,
   onSelect,
+  hovered,
+  onHover,
 }: {
   board: Board
   order: Order
@@ -43,8 +45,12 @@ export function BoardTable({
   now: Date
   folded: ReadonlySet<string>
   onFold: (personId: string) => void
+  /** The day pinned in the panel (clicked). */
   selection: Selection | null
   onSelect: (selection: Selection) => void
+  /** The day pointed at (or focused), which the panel shows until the pointer leaves. */
+  hovered: Selection | null
+  onHover: (selection: Selection | null) => void
 }) {
   // Too narrow for every day (a phone): the days scroll under the names, starting at today.
   const table = useRef<HTMLTableElement>(null)
@@ -94,6 +100,8 @@ export function BoardTable({
           onFold={() => onFold(person.id)}
           selectedDay={selection?.personId === person.id ? selection.day : null}
           onSelect={(day) => onSelect({ personId: person.id, day })}
+          hoveredDay={hovered?.personId === person.id ? hovered.day : null}
+          onHover={(day) => onHover(day ? { personId: person.id, day } : null)}
         />
       ))}
     </Table>
@@ -142,6 +150,8 @@ function Person({
   onFold,
   selectedDay,
   onSelect,
+  hoveredDay,
+  onHover,
 }: {
   person: PersonBoard
   board: Board
@@ -152,16 +162,20 @@ function Person({
   onFold: () => void
   selectedDay: string | null
   onSelect: (day: string) => void
+  hoveredDay: string | null
+  onHover: (day: string | null) => void
 }) {
   const glows = useGlow("person", person.id)
-  // The day under the mouse: its whole column lights up for this person, the band a click
-  // would open. Found from the box under the pointer, so moving between boxes of one day
-  // keeps it lit; touch has no hover, so taps leave it alone.
-  const [hoveredDay, setHoveredDay] = useState<string | null>(null)
+  // The day under the mouse, or the box focused with the keyboard: its whole column lights up
+  // for this person and the panel shows it. Found from the day cell under the pointer, so
+  // moving between one day's boxes keeps it; a medicine's name clears it. Touch has no hover,
+  // so taps only pin.
+  const point = (target: EventTarget) => {
+    const cell = target instanceof Element ? target.closest<HTMLElement>("[data-day]") : null
+    onHover(cell?.dataset.day ?? null)
+  }
   const hover = (event: PointerEvent<HTMLElement>) => {
-    if (event.pointerType === "touch") return
-    const box = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-day]") : null
-    setHoveredDay(box?.dataset.day ?? null)
+    if (event.pointerType !== "touch") point(event.target)
   }
   const rowsId = `rows-${person.id}`
   const recent = !person.waiting && order !== "joined" && now.getTime() - Date.parse(person.updatedAt) < freshFor
@@ -192,7 +206,14 @@ function Person({
           </TableHead>
         </TableRow>
       </TableBody>
-      <TableBody id={rowsId} hidden={folded} onPointerOver={hover} onPointerLeave={() => setHoveredDay(null)}>
+      <TableBody
+        id={rowsId}
+        hidden={folded}
+        onPointerOver={hover}
+        onPointerLeave={() => onHover(null)}
+        onFocus={(event) => point(event.target)}
+        onBlur={() => onHover(null)}
+      >
         {person.waiting && (
           <TableRow className="border-0 hover:bg-transparent">
             <TableCell colSpan={board.columns.length + 1} className="px-1 pb-3 text-base text-muted-foreground">
@@ -218,7 +239,8 @@ function Person({
             </TableHead>
             {row.cells.map((cell, column) => (
               // Keyed by what the box shows, so a change mounts it afresh and it can glow once.
-              <TableCell key={cell.key} className="px-[3px] py-0">
+              // The cell, not the box, names the day, so the gaps between boxes count as that day.
+              <TableCell key={cell.key} data-day={cell.day} className="px-[3px] py-0">
                 <DoseCell
                   person={person}
                   row={row}
