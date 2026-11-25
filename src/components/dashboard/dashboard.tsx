@@ -9,6 +9,7 @@ import { useNow } from "@/hooks/use-now"
 import { fetchPatients, KeyRejected, resetDemo } from "@/lib/api"
 import { buildBoard, dayEvents, type Order, orders, quietDay } from "@/lib/board"
 import { currentKey, subscribeToKey } from "@/lib/dashboard-key"
+import { samplePatients } from "@/lib/sample-patients"
 
 import { BoardTable, type Selection } from "./board-table"
 import { DayPanel, type OpenDay } from "./day-panel"
@@ -18,8 +19,9 @@ import { TopBar } from "./top-bar"
 
 /** How often the dashboard asks for changes. */
 const pollInterval = 2000
-/** Where this browser remembers the order chosen. */
+/** Where this browser remembers the order chosen, and whether it shows the sample patients. */
 const orderKey = "my-pharmacist.dashboard-order"
+const samplesKey = "my-pharmacist.dashboard-samples"
 
 /** The page: the key first, then everyone sharing. */
 export function Dashboard() {
@@ -50,11 +52,19 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
   })
 
   const [order, setOrder] = useState<Order>(savedOrder)
+  const [samples, setSamples] = useState(savedSamples)
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set())
   const [selection, setSelection] = useState<Selection | null>(null)
 
   const now = useNow()
-  const board = useMemo(() => (patients.data ? buildBoard(patients.data, now, order) : null), [patients.data, now, order])
+  // Made afresh each minute, so their doses keep being taken as the day goes on.
+  const minuteNow = Math.floor(now.getTime() / 60_000)
+  const sampled = useMemo(() => (samples ? samplePatients(new Date(minuteNow * 60_000)) : []), [samples, minuteNow])
+  const everyone = useMemo(() => [...(patients.data ?? []), ...sampled], [patients.data, sampled])
+  const board = useMemo(
+    () => (patients.data || samples ? buildBoard(everyone, now, order) : null),
+    [patients.data, samples, everyone, now, order],
+  )
   const fresh = useFresh(useMemo(() => (board ? keysOf(board.people) : null), [board]))
 
   const refused = patients.error instanceof KeyRejected
@@ -71,20 +81,22 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
       : patients.isSuccess
         ? "live"
         : "connecting"
-  const open = openDay(selection, board, patients.data ?? [], now)
+  const open = openDay(selection, board, everyone, now)
   const chooseOrder = (next: Order) => {
     setOrder(next)
-    try {
-      window.localStorage.setItem(orderKey, next)
-    } catch {
-      // Not remembered (a private window): it still applies until the page closes.
-    }
+    remember(orderKey, next)
+  }
+  const showSamples = (on: boolean) => {
+    setSamples(on)
+    remember(samplesKey, on ? "on" : "off")
   }
 
   return (
     <div className="mx-auto flex min-h-svh w-full max-w-[1240px] flex-col gap-5 px-4 py-7 sm:px-6">
       <TopBar
         status={status}
+        samples={samples}
+        onSamples={showSamples}
         resetError={reset.error ? reset.error.message : null}
         onReset={() => {
           setSelection(null)
@@ -118,14 +130,6 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
           </FreshProvider>
         )}
       </main>
-      <footer className="flex flex-col gap-1.5 px-1 text-[15px] text-muted-foreground">
-        <p>Scanned doses show the pill as the scan saw it; a ✓ was ticked by hand; an empty box wasn&apos;t taken.</p>
-        <p className="text-sm">
-          A demo with a fictional pharmacy. Records and pictures are deleted on Reset demo, when a phone stops sharing,
-          or after 14 days without updates. The pharmacy isn&apos;t alerted; people still call their pharmacist if
-          they&apos;re unsure about a dose.
-        </p>
-      </footer>
     </div>
   )
 }
@@ -137,6 +141,23 @@ function savedOrder(): Order {
     return orders.find((order) => order === saved) ?? "updated"
   } catch {
     return "updated"
+  }
+}
+
+/** Whether this browser showed the sample patients last time; off at first. */
+function savedSamples(): boolean {
+  try {
+    return window.localStorage.getItem(samplesKey) === "on"
+  } catch {
+    return false
+  }
+}
+
+function remember(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {
+    // Not remembered (a private window): it still applies until the page closes.
   }
 }
 

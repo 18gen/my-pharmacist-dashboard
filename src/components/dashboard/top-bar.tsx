@@ -1,29 +1,42 @@
-import { cn } from "@/lib/utils"
+import { Switch } from "@/components/ui/switch"
 
 import { ConfirmAction } from "./confirm-action"
 import { Storefront } from "./glyphs"
 
-/** The pharmacy, whether the page is live, and Reset demo. */
+/** The pharmacy, the sample patients' switch and Reset demo; a notice only while the page can't update. */
 export function TopBar({
   status,
+  samples,
+  onSamples,
   resetError,
   onReset,
 }: {
   status: "connecting" | "live" | "reconnecting"
+  samples: boolean
+  onSamples: (on: boolean) => void
   resetError: string | null
   onReset: () => void
 }) {
   return (
-    <header className="flex flex-wrap items-center gap-x-4 gap-y-3">
+    <header className="flex flex-wrap items-center gap-x-5 gap-y-3">
       <span className="grid size-12 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
         <Storefront className="size-6" />
       </span>
-      {/* At least this wide, so on a phone "Live" and Reset demo go under the name, not over it. */}
+      {/* At least this wide, so on a phone the controls go under the name, not over it. */}
       <div className="flex min-w-48 flex-1 flex-col">
         <h1 className="font-heading text-3xl leading-tight font-medium">Sample Pharmacy</h1>
         <p className="text-[15px] text-muted-foreground">Demo dashboard</p>
       </div>
-      <LiveStatus status={status} />
+      {status === "reconnecting" && (
+        <span role="status" className="inline-flex items-center gap-2 text-[15px] font-semibold text-caution">
+          <span aria-hidden className="size-2.5 rounded-full bg-caution" />
+          Reconnecting…
+        </span>
+      )}
+      <label className="inline-flex cursor-pointer items-center gap-2.5 text-[15px] font-semibold">
+        <Switch checked={samples} onCheckedChange={(checked) => onSamples(checked)} />
+        Sample patients
+      </label>
       <div className="flex flex-col items-end gap-1">
         <ConfirmAction
           label="Reset demo"
@@ -41,27 +54,5 @@ export function TopBar({
         )}
       </div>
     </header>
-  )
-}
-
-function LiveStatus({ status }: { status: "connecting" | "live" | "reconnecting" }) {
-  const label = { connecting: "Connecting…", live: "Live", reconnecting: "Reconnecting…" }[status]
-  return (
-    <span
-      role="status"
-      className={cn(
-        "inline-flex items-center gap-2 text-[17px] font-semibold",
-        status === "live" ? "text-ok" : status === "reconnecting" ? "text-caution" : "text-muted-foreground",
-      )}
-    >
-      <span
-        aria-hidden
-        className={cn(
-          "size-2.5 rounded-full",
-          status === "live" ? "bg-ok motion-safe:animate-pulse" : status === "reconnecting" ? "bg-caution" : "bg-muted-foreground",
-        )}
-      />
-      {label}
-    </span>
   )
 }
