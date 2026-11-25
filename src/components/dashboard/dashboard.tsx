@@ -109,7 +109,7 @@ function Board({ dashboardKey, onRefused }: { dashboardKey: string; onRefused: (
           <FreshProvider value={fresh}>
             <section
               aria-label="Doses this week"
-              className="max-w-full min-w-0 flex-[0_1_auto] rounded-3xl border border-edge bg-card px-4 pt-3 pb-4 shadow-[0_2px_3px_rgba(33,20,15,0.10)]"
+              className="max-w-full min-w-0 flex-[0_1_auto] rounded-3xl border border-edge bg-card px-4 pt-3 pb-1.5 shadow-[0_2px_3px_rgba(33,20,15,0.10)]"
             >
               <BoardTable
                 board={board}

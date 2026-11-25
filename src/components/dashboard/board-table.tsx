@@ -234,6 +234,14 @@ function Person({
             ))}
           </TableRow>
         ))}
+        {/* Room under the last row, so the day's band and the times end clear of the line to the
+            next person. A row of its own, as padding in the cells would draw the medicine
+            column's line down to it. */}
+        {person.rows.length > 0 && (
+          <TableRow aria-hidden className="border-0 hover:bg-transparent">
+            <TableCell colSpan={board.columns.length + 1} className="h-4 p-0" />
+          </TableRow>
+        )}
       </TableBody>
     </>
   )
