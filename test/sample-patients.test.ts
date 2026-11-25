@@ -18,11 +18,11 @@ describe("the sample patients", () => {
     }
   })
 
-  it("are Rosa with 2 rows and David with 5, with IDs no phone gets", () => {
+  it("are Helen with 2 rows and Frank with 5, with IDs no phone gets", () => {
     const board = buildBoard(samplePatients(on(15, 40)), on(15, 40), "name")
     expect(board.people.map((person) => [person.name, person.rows.length])).toEqual([
-      ["David", 5],
-      ["Rosa", 2],
+      ["Frank", 5],
+      ["Helen", 2],
     ])
     expect(board.people.every((person) => person.id.startsWith("sample-"))).toBe(true)
   })
@@ -41,17 +41,18 @@ describe("the sample patients", () => {
       expect(person.warned).toBe(0)
     }
     expect(states.map((person) => [person.name, person.missed])).toEqual([
-      ["David", 2],
-      ["Rosa", 1],
+      ["Frank", 2],
+      ["Helen", 1],
     ])
     for (const patient of samplePatients(now)) expect(patient.snapshot?.scans).toEqual([])
   })
 
   it("take each dose a few minutes after its time, so one can be due now", () => {
-    // David's 8:00 doses: due at 8:01, scanned by 8:30.
-    const due = buildBoard(samplePatients(on(8, 1)), on(8, 1), "name").people[0]!
+    // Frank's 8:00 doses: due at 8:01, scanned by 8:30.
+    const frank = (now: Date) => buildBoard(samplePatients(now), now, "name").people.find((person) => person.name === "Frank")!
+    const due = frank(on(8, 1))
     expect(due.rows.flatMap((row) => row.cells).some((cell) => cell.state === "due")).toBe(true)
-    const later = buildBoard(samplePatients(on(8, 30)), on(8, 30), "name").people[0]!
+    const later = frank(on(8, 30))
     expect(later.rows.flatMap((row) => row.cells).some((cell) => cell.state === "due")).toBe(false)
   })
 

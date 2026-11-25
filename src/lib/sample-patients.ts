@@ -11,15 +11,15 @@ import type { Snapshot } from "@/lib/snapshot"
  * phone would report them: nearly all by a scan, now and then ticked by hand, a few missed
  * over the week, and no "don't take" warnings. They send no scan pictures, so their boxes
  * show the medicine's own, as for any dose without one.
- * - Rosa: hormone therapy, a tablet each morning and each evening.
- * - David: capecitabine twice a day with the medicines that go with it, and ondansetron
+ * - Helen: hormone therapy, a tablet each morning and each evening.
+ * - Frank: capecitabine twice a day with the medicines that go with it, and ondansetron
  *   when needed.
  */
 export function samplePatients(now: Date): SharedPatient[] {
-  return [rosa(now), david(now)]
+  return [helen(now), frank(now)]
 }
 
-function rosa(now: Date): SharedPatient {
+function helen(now: Date): SharedPatient {
   const { snapshot } = buildSnapshot(
     now,
     [
@@ -33,10 +33,10 @@ function rosa(now: Date): SharedPatient {
       },
     },
   )
-  return patient("rosa", "Rosa", now, snapshot)
+  return patient("helen", "Helen", now, snapshot)
 }
 
-function david(now: Date): SharedPatient {
+function frank(now: Date): SharedPatient {
   const { snapshot } = buildSnapshot(
     now,
     [
@@ -57,7 +57,7 @@ function david(now: Date): SharedPatient {
       ],
     },
   )
-  return patient("david", "David", now, snapshot)
+  return patient("frank", "Frank", now, snapshot)
 }
 
 /** Taken a few minutes after its time; by a scan, except every `handEvery`th dose, ticked by hand. */
